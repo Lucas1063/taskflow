@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: lucasw1063/taskflow-backend:1.0
+          image: lucasw1063/taskflow-backend:1.1
           ports: [{ containerPort: 3000 }]
           envFrom:
             - secretRef: { name: taskflow-config }
