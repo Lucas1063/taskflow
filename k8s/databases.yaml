@@ -1,0 +1,28 @@
+# k8s/databases.yaml  (apenas MongoDB, fixo no master)
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: mongo, namespace: taskflow }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mongo } }
+  template:
+    metadata: { labels: { app: mongo } }
+    spec:
+      nodeSelector: { role: infra }   # obriga a ficar no master
+      tolerations:
+        - { key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule }
+      containers:
+        - name: mongo
+          image: mongo:7
+          ports: [{ containerPort: 27017 }]
+          volumeMounts: [{ name: dados, mountPath: /data/db }]
+      volumes:
+        - name: dados
+          hostPath: { path: /opt/taskflow/mongo, type: DirectoryOrCreate }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: mongo, namespace: taskflow }
+spec:
+  selector: { app: mongo }
+  ports: [{ port: 27017, targetPort: 27017 }]
