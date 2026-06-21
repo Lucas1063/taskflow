@@ -19,3 +19,7 @@ variable "master_type" {
 variable "worker_type" {
   default = "t3.small"
 }
+variable "jwt_secret" {
+  type      = string
+  sensitive = true
+}
