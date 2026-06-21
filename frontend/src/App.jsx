@@ -3,17 +3,29 @@ import { registrar, entrar, listarTarefas, criarTarefa, concluirTarefa, deletarT
 import './App.css'; // <-- Importando nosso novo visual
 
 export default function App() {
-const [logado, setLogado] = useState(true);
+  // CORREÇÃO: antes era useState(true), o que pulava a tela de login
+  // mesmo sem token salvo. Agora só começa logado se já existir um token.
+  const [logado, setLogado] = useState(() => !!localStorage.getItem('token'));
   const [modo, setModo] = useState('login');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [tarefas, setTarefas] = useState([]);
   const [novaTarefa, setNovaTarefa] = useState('');
-  
 
-  useEffect(() => { 
-    if (logado) listarTarefas().then(setTarefas); 
+  useEffect(() => {
+    if (logado) {
+      listarTarefas()
+        .then(setTarefas)
+        .catch((e) => {
+          // Se o token expirou ou é inválido, volta pro login em vez de quebrar a tela
+          if (e.status === 401) {
+            sair();
+          } else {
+            setErro(e.message);
+          }
+        });
+    }
   }, [logado]);
 
   async function enviar() {
@@ -27,7 +39,7 @@ const [logado, setLogado] = useState(true);
 
   async function adicionar() {
     if (!novaTarefa.trim()) return;
-    await criarTarefa(novaTarefa); 
+    await criarTarefa(novaTarefa);
     setNovaTarefa('');
     setTarefas(await listarTarefas());
   }
@@ -43,10 +55,10 @@ const [logado, setLogado] = useState(true);
     setTarefas(await listarTarefas());
   }
 
-  function sair() { 
-    localStorage.removeItem('token'); 
-    setLogado(false); 
-    
+  function sair() {
+    localStorage.removeItem('token');
+    setLogado(false);
+    setTarefas([]);
   }
 
   // ----- Tela de entrar / cadastrar -----
@@ -55,18 +67,18 @@ const [logado, setLogado] = useState(true);
       <div className='card auth-card'>
         <h1 className='logo'>TaskFlow</h1>
         <h2>{modo === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}</h2>
-        
+
         <div className='form-group'>
           <input placeholder='E-mail' type='email' value={email} onChange={e => setEmail(e.target.value)} />
           <input placeholder='Senha' type='password' value={senha} onChange={e => setSenha(e.target.value)} />
         </div>
-        
+
         {erro && <p className='erro'>{erro}</p>}
-        
+
         <button className='btn-primary full-width' onClick={enviar}>
           {modo === 'login' ? 'Entrar' : 'Cadastrar'}
         </button>
-        
+
         <button className='btn-link' onClick={() => setModo(modo === 'login' ? 'cadastro' : 'login')}>
           {modo === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
         </button>
@@ -82,17 +94,17 @@ const [logado, setLogado] = useState(true);
           <h1>Minhas tarefas</h1>
           <button className='btn-outline' onClick={sair}>Sair</button>
         </div>
-        
+
         <div className='nova-tarefa'>
-          <input 
-            placeholder='O que você precisa fazer hoje?' 
+          <input
+            placeholder='O que você precisa fazer hoje?'
             value={novaTarefa}
             onChange={e => setNovaTarefa(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && adicionar()} // Adiciona ao apertar Enter
           />
           <button className='btn-primary' onClick={adicionar}>Adicionar</button>
         </div>
-        
+
         {tarefas.length === 0 ? (
           <p className='empty-state'>Você não tem nenhuma tarefa pendente. Oba! 🎉</p>
         ) : (

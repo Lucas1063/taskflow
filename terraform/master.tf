@@ -3,9 +3,12 @@ resource "aws_instance" "master" {
   instance_type          = var.master_type
   key_name               = var.key_name
   subnet_id              = data.aws_subnets.default.ids[1]
-  vpc_security_group_ids = [aws_security_group.cluster.id]
   iam_instance_profile   = var.instance_profile
   user_data              = file("${path.module}/scripts/master.sh")
+  vpc_security_group_ids = [
+    aws_security_group.cluster.id,
+    aws_security_group.app_from_lb.id
+  ]
 
   tags = {
     Name = "k3s-master"
@@ -22,11 +25,11 @@ resource "null_resource" "deploy_k8s" {
   connection {
     type        = "ssh"
     user        = "ubuntu"
-    private_key = file("${path.module}/vockey.pem") # Ajuste aqui se a sua chave tiver outro nome
+    private_key = file("${path.module}/vockey.pem")
     host        = aws_instance.master.public_ip
   }
 
-  # Passo 1: Copia a pasta k8s (voltando um nível de diretório) para o Ubuntu
+  # Passo 1: Copia a pasta k8s para o Ubuntu
   provisioner "file" {
     source      = "${path.module}/../k8s"
     destination = "/home/ubuntu/k8s"
@@ -37,12 +40,12 @@ resource "null_resource" "deploy_k8s" {
     inline = [
       "echo 'Aguardando o K3s iniciar (45 segundos)...'",
       "sleep 45",
-      
+      "echo 'Criando o Namespace taskflow...'",
+      "sudo k3s kubectl create namespace taskflow || true",
       "echo 'Aplicando os arquivos YAML...'",
       "sudo k3s kubectl apply -f /home/ubuntu/k8s/databases.yaml",
       "sudo k3s kubectl apply -f /home/ubuntu/k8s/backend.yaml",
       "sudo k3s kubectl apply -f /home/ubuntu/k8s/frontend.yaml",
-      
       "echo 'Deploy finalizado com sucesso!'"
     ]
   }

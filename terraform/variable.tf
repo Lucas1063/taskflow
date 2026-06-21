@@ -11,7 +11,7 @@ variable "instance_profile" {
   default = "LabInstanceProfile"
 }
 variable "notification_email" {
-  default = "lucas.weige@unidavi.edu.br"
+  default = "lucas.weigel@unidavi.edu.br"
 }
 variable "master_type" {
   default = "t3.medium"

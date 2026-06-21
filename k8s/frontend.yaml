@@ -10,7 +10,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: lucasw1063/taskflow-frontend:1.1
+          image: lucasw1063/taskflow-frontend:1.2
+          imagePullPolicy: Always
           ports: [{ containerPort: 80 }]
           resources:
             requests: { cpu: '50m', memory: '64Mi' }
