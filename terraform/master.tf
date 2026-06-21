@@ -16,16 +16,13 @@ resource "aws_instance" "master" {
   }
 }
 
-# --- Bloco de Automação do Kubernetes ---
 resource "null_resource" "deploy_k8s" {
-  # O Terraform só tenta rodar isso DEPOIS que o master e a fila existirem
   depends_on = [aws_instance.master, aws_sqs_queue.events]
 
-  # Re-roda automaticamente se algum desses valores mudar
   triggers = {
-    master_id  = aws_instance.master.id
-    sqs_url    = aws_sqs_queue.events.url
-    jwt_secret = var.jwt_secret
+    master_id          = aws_instance.master.id
+    sqs_url            = aws_sqs_queue.events.url
+    jwt_secret         = var.jwt_secret
     k8s_manifests_hash = sha1(join("", [for f in fileset("${path.module}/../k8s", "*.yaml") : filesha1("${path.module}/../k8s/${f}")]))
   }
 
@@ -43,21 +40,30 @@ resource "null_resource" "deploy_k8s" {
 
   provisioner "remote-exec" {
     inline = [
-      "echo 'Aguardando o K3s iniciar (45 segundos)...'",
-      "sleep 45",
+      "echo 'Aguardando o k3s ficar pronto...'",
+      "until sudo k3s kubectl get nodes >/dev/null 2>&1; do echo 'k3s ainda nao respondeu, aguardando 5s...'; sleep 5; done",
+      "echo 'k3s pronto!'",
       "echo 'Criando o Namespace taskflow...'",
       "sudo k3s kubectl create namespace taskflow || true",
-      "echo 'Criando/atualizando o secret taskflow-config...'",
-      "sudo k3s kubectl create secret generic taskflow-config -n taskflow \\",
-      "  --from-literal=MONGO_URL='mongodb://mongo:27017/taskflow' \\",
-      "  --from-literal=JWT_SECRET='${var.jwt_secret}' \\",
-      "  --from-literal=SQS_URL='${aws_sqs_queue.events.url}' \\",
-      "  --dry-run=client -o yaml | sudo k3s kubectl apply -f -",
       "echo 'Aplicando os arquivos YAML...'",
       "sudo k3s kubectl apply -f /home/ubuntu/k8s/databases.yaml",
       "sudo k3s kubectl apply -f /home/ubuntu/k8s/backend.yaml",
       "sudo k3s kubectl apply -f /home/ubuntu/k8s/frontend.yaml",
       "echo 'Deploy finalizado com sucesso!'"
+    ]
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo k3s kubectl create secret generic taskflow-config -n taskflow --from-literal=MONGO_URL='mongodb://mongo:27017/taskflow' --from-literal=JWT_SECRET='${var.jwt_secret}' --from-literal=SQS_URL='${aws_sqs_queue.events.url}' --dry-run=client -o yaml | sudo k3s kubectl apply -f -",
+      "echo 'Secret taskflow-config aplicado com sucesso!'"
+    ]
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo k3s kubectl rollout restart deployment/backend -n taskflow || true",
+      "sudo k3s kubectl rollout status deployment/backend -n taskflow --timeout=120s || true"
     ]
   }
 }
